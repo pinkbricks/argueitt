@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Landing from './pages/Landing'
 import Speak from './pages/Speak'
 import ComingSoon from './pages/ComingSoon'
+import SignIn from './pages/SignIn'
 
 function getPath() {
   return window.location.pathname
@@ -25,6 +26,10 @@ function App() {
 
   if (path === '/speak') {
     return <Speak onNavigate={navigate} />
+  }
+
+  if (path === '/sign-in') {
+    return <SignIn onNavigate={navigate} />
   }
 
   if (path === '/') {

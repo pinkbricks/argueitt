@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import AccountMenu from './AccountMenu'
+import { useSession } from '../hooks/useSession'
 import './SiteChrome.css'
 
 const NAV_LINKS = [
@@ -9,6 +11,7 @@ const NAV_LINKS = [
 
 function SiteHeader({ onNavigate }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const { user, status, signOut } = useSession()
 
   const go = (to) => (event) => {
     event.preventDefault()
@@ -33,14 +36,22 @@ function SiteHeader({ onNavigate }) {
               {label}
             </a>
           ))}
-          <a href="/sign-in" className="btn-signin nav-signin" onClick={go('/sign-in')}>
-            Sign In
-          </a>
+          {!user && (
+            <a href="/sign-in" className="btn-signin nav-signin" onClick={go('/sign-in')}>
+              Sign In
+            </a>
+          )}
         </nav>
 
-        <a href="/sign-in" className="btn-signin desktop-signin" onClick={go('/sign-in')}>
-          Sign In
-        </a>
+        {status === 'loading' ? (
+          <span className="account-placeholder" aria-hidden="true" />
+        ) : user ? (
+          <AccountMenu user={user} onSignOut={signOut} />
+        ) : (
+          <a href="/sign-in" className="btn-signin desktop-signin" onClick={go('/sign-in')}>
+            Sign In
+          </a>
+        )}
 
         <button
           type="button"

@@ -8,11 +8,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from starlette.middleware.sessions import SessionMiddleware
 from google import genai
 from google.genai import errors as genai_errors
 from pydantic import BaseModel
 
+import auth
 from framework import get_framework
 from metrics import score_response
 from stats import DeliveryMetrics, compute_delivery_metrics
@@ -31,6 +33,22 @@ DEFAULT_CHALLENGE_TYPE = 'answer_the_unexpected'
 
 app = FastAPI()
 store_lock = asyncio.Lock()
+
+# Signed, HttpOnly cookie. Vite proxies /api to this server, so dev is
+# same-origin and the cookie needs no CORS handling; keep the two behind one
+# origin in production and it stays that way.
+SESSION_SECRET = os.getenv('SESSION_SECRET')
+if not SESSION_SECRET:
+    raise RuntimeError('SESSION_SECRET is not set — see backend/.env')
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SESSION_SECRET,
+    session_cookie='argueitt_session',
+    https_only=os.getenv('ENV') == 'production',
+    same_site='lax',
+    max_age=60 * 60 * 24 * 30,
+)
 
 
 class TranscriptResult(BaseModel):
@@ -53,6 +71,17 @@ class DeliveryMetricsOut(BaseModel):
     longest_pause_sec: float
     pause_details: list[dict]
     time_to_first_content_word_sec: float
+
+
+class GoogleCredential(BaseModel):
+    credential: str
+
+
+class SessionUser(BaseModel):
+    id: str
+    email: str
+    name: str
+    picture: str
 
 
 class AnalyzeResult(BaseModel):
@@ -118,8 +147,47 @@ def root():
     return {'status': 'ok'}
 
 
+def current_user_id(request: Request) -> str | None:
+    """The signed-in user's id, or None — signing in is optional."""
+    return request.session.get('user_id')
+
+
+@app.post('/api/auth/google', response_model=SessionUser)
+async def sign_in_with_google(body: GoogleCredential, request: Request):
+    try:
+        claims = auth.verify_credential(body.credential)
+    except auth.AuthError as exc:
+        logger.warning('Google sign-in rejected: %s', exc)
+        raise HTTPException(status_code=401, detail=str(exc))
+
+    user = await auth.upsert_user(claims)
+    # A fresh session id on sign-in, so a pre-login cookie can't be replayed.
+    request.session.clear()
+    request.session['user_id'] = user['id']
+    return SessionUser(**auth.public_user(user))
+
+
+@app.get('/api/auth/me')
+async def me(request: Request):
+    user_id = current_user_id(request)
+    if not user_id:
+        return {'user': None}
+    user = next((u for u in auth.load_users() if u['id'] == user_id), None)
+    if user is None:
+        request.session.clear()
+        return {'user': None}
+    return {'user': auth.public_user(user)}
+
+
+@app.post('/api/auth/sign-out')
+async def sign_out(request: Request):
+    request.session.clear()
+    return {'status': 'ok'}
+
+
 @app.post('/api/transcribe', response_model=TranscriptResult)
 async def transcribe(
+    request: Request,
     topic: str = Form(...),
     side: str = Form(...),
     audio: UploadFile = File(...),
@@ -133,6 +201,9 @@ async def transcribe(
     record = {
         'id': uuid.uuid4().hex,
         'created_at': datetime.now(timezone.utc).isoformat(),
+        # None for signed-out attempts; History and Progress will need this to
+        # tell one person's attempts from another's.
+        'user_id': current_user_id(request),
         'topic': topic,
         'side': side,
         'transcript': transcript,
