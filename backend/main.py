@@ -110,8 +110,11 @@ async def with_retries(coro_fn):
         except HTTPException:
             raise
         except Exception as exc:
-            logger.exception('Gemini call failed')
-            raise HTTPException(502, f'Gemini request failed: {type(exc).__name__}: {exc}') from exc
+            # The detail stays out of the response body on purpose: exception
+            # text from the API clients can quote request headers, which carry
+            # the API key. It goes to the logs, where it belongs.
+            logger.exception('Upstream model call failed')
+            raise HTTPException(502, 'The analysis service is unavailable right now.') from exc
     raise HTTPException(503, 'Gemini is busy, try again in a moment')
 
 
