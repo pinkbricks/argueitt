@@ -59,23 +59,24 @@ function AiFeedback({ topic, side, audioBlob, previous, onResult }) {
       }
     }
 
-    const post = async (url, fields) => {
-      const form = new FormData()
-      Object.entries(fields).forEach(([k, v]) => form.append(k, v))
-      form.append('audio', audioBlob, 'speech.wav')
-      const res = await fetch(url, { method: 'POST', body: form })
-      if (!res.ok) throw new Error()
-      return res.json()
-    }
+    // One request: the server transcribes and scores in the same call, so
+    // nothing has to be handed between invocations through a store.
     ;(async () => {
       try {
-        const saved = await post('/api/transcribe', { topic, side })
-        if (cancelled) return
-        setStatus('analysing')
-        const json = await post('/api/analyze', {
-          transcript_id: saved.id,
-          previous_next_focus: previous?.next_focus || '',
+        const form = new FormData()
+        form.append('topic', topic)
+        form.append('side', side)
+        form.append('previous_next_focus', previous?.next_focus || '')
+        form.append('audio', audioBlob, 'speech.wav')
+
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          credentials: 'same-origin',
+          body: form,
         })
+        if (!res.ok) throw new Error('analysis failed')
+
+        const json = await res.json()
         if (cancelled) return
         onResult(json)
         setStatus('done')

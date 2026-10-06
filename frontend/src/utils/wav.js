@@ -45,6 +45,34 @@ export function audioBufferToWavBlob(audioBuffer) {
   return new Blob([buffer], { type: 'audio/wav' })
 }
 
+// 16 kHz is the rate speech recognition actually works at — Deepgram and
+// Gemini resample to it anyway — so sending the mic's native 48 kHz costs
+// upload size and buys nothing. At 16-bit mono this is ~32 KB per second:
+// a 60-second attempt goes from roughly 5.5 MB to 1.9 MB, which also keeps it
+// under the 4.5 MB request body limit on serverless hosts.
+const TARGET_SAMPLE_RATE = 16000
+
+async function resample(audioBuffer, targetRate) {
+  if (audioBuffer.sampleRate <= targetRate) return audioBuffer
+
+  const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext
+  if (!OfflineCtx) return audioBuffer
+
+  const frames = Math.ceil(audioBuffer.duration * targetRate)
+  const offline = new OfflineCtx(1, frames, targetRate)
+  const source = offline.createBufferSource()
+  source.buffer = audioBuffer
+  source.connect(offline.destination)
+  source.start()
+
+  try {
+    return await offline.startRendering()
+  } catch {
+    // Not worth failing a recording over: fall back to the original rate.
+    return audioBuffer
+  }
+}
+
 // Decodes a recorded audio Blob (e.g. webm/opus) and re-encodes it as a WAV Blob.
 export async function toWavBlob(blob) {
   const arrayBuffer = await blob.arrayBuffer()
@@ -52,7 +80,7 @@ export async function toWavBlob(blob) {
   const ctx = new AudioContextClass()
   try {
     const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
-    return audioBufferToWavBlob(audioBuffer)
+    return audioBufferToWavBlob(await resample(audioBuffer, TARGET_SAMPLE_RATE))
   } finally {
     ctx.close()
   }

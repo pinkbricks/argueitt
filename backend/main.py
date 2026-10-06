@@ -51,11 +51,6 @@ app.add_middleware(
 )
 
 
-class TranscriptResult(BaseModel):
-    id: str
-    transcript: str
-
-
 class FunctionResult(BaseModel):
     evidence: str
     score: int
@@ -185,24 +180,46 @@ async def sign_out(request: Request):
     return {'status': 'ok'}
 
 
-async def attach_analysis(transcript_id: str, analysis: dict) -> None:
+async def remember_attempt(
+    request: Request,
+    topic: str,
+    side: str,
+    transcript: str,
+    words: list,
+    audio: bytes,
+    audio_type: str | None,
+    analysis: dict,
+) -> None:
     """
-    Stores the analysis on its transcript record.
+    Saves a finished attempt for the Progress page.
 
-    Until now the result was returned and thrown away, which left nothing for
-    the Progress page to read. Re-running analysis on the same transcript
-    overwrites the old result rather than accumulating copies.
+    Best-effort on purpose: the feedback has already been produced by the time
+    this runs, so a store that can't be written — a read-only filesystem on a
+    serverless host, a full disk — costs the user their history, not their
+    result. It is logged and swallowed rather than failing the request.
     """
-    analysis = {**analysis, 'analysed_at': datetime.now(timezone.utc).isoformat()}
-    async with store_lock:
-        records = load_records()
-        for record in records:
-            if record['id'] == transcript_id:
-                record['analysis'] = analysis
-                break
-        else:
-            return
-        save_records(records)
+    record = {
+        'id': uuid.uuid4().hex,
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        # None for signed-out attempts; Progress needs this to tell one
+        # person's attempts from another's.
+        'user_id': current_user_id(request),
+        'topic': topic,
+        'side': side,
+        'transcript': transcript,
+        'words': words,
+        'audio_bytes': len(audio),
+        'audio_type': audio_type,
+        'analysis': {**analysis, 'analysed_at': datetime.now(timezone.utc).isoformat()},
+    }
+
+    try:
+        async with store_lock:
+            records = load_records()
+            records.append(record)
+            save_records(records)
+    except OSError as exc:
+        logger.warning('Could not save attempt (feedback was still returned): %s', exc)
 
 
 def attempt_summary(record: dict) -> dict:
@@ -231,52 +248,36 @@ async def attempts(request: Request):
     return {'attempts': [attempt_summary(r) for r in mine]}
 
 
-@app.post('/api/transcribe', response_model=TranscriptResult)
-async def transcribe(
+@app.post('/api/analyze', response_model=AnalyzeResult)
+async def analyze(
     request: Request,
     topic: str = Form(...),
     side: str = Form(...),
     audio: UploadFile = File(...),
+    previous_next_focus: str = Form(''),
 ):
+    """
+    Transcribes and scores one attempt in a single request.
+
+    This used to be two endpoints: /api/transcribe wrote a record, and
+    /api/analyze read the word timings back out of it. That handed off state
+    through the transcript store, which only works where the two calls share a
+    filesystem — on a serverless host they are separate invocations and the
+    second one can't find what the first wrote. Keeping it in one request means
+    the feedback loop needs no storage at all; saving the attempt afterwards is
+    for Progress, and is allowed to fail.
+    """
     data = await read_audio(audio)
     client = get_client()
     transcript, words = await with_retries(
         lambda: transcribe_words(client, data, audio.content_type)
     )
 
-    record = {
-        'id': uuid.uuid4().hex,
-        'created_at': datetime.now(timezone.utc).isoformat(),
-        # None for signed-out attempts; History and Progress will need this to
-        # tell one person's attempts from another's.
-        'user_id': current_user_id(request),
-        'topic': topic,
-        'side': side,
-        'transcript': transcript,
-        'words': words,
-        'audio_bytes': len(data),
-        'audio_type': audio.content_type,
-    }
-    async with store_lock:
-        records = load_records()
-        records.append(record)
-        save_records(records)
-    return TranscriptResult(id=record['id'], transcript=transcript)
-
-
-@app.post('/api/analyze', response_model=AnalyzeResult)
-async def analyze(transcript_id: str = Form(...), previous_next_focus: str = Form('')):
-    async with store_lock:
-        record = next((r for r in load_records() if r['id'] == transcript_id), None)
-    if record is None:
-        raise HTTPException(404, 'Transcript not found')
-
     framework_name = get_framework(DEFAULT_CHALLENGE_TYPE)['framework_name']
-    words = record.get('words') or []
 
     if not words:
         empty_metrics = DeliveryMetrics(0, 0.0, 0.0, 0, [], 0, 0.0, [], 0.0)
-        await attach_analysis(transcript_id, {
+        empty = {
             'challenge_type': DEFAULT_CHALLENGE_TYPE,
             'framework_name': framework_name,
             'model_version': 'n/a',
@@ -285,40 +286,32 @@ async def analyze(transcript_id: str = Form(...), previous_next_focus: str = For
             'passed': False,
             'strongest_moment': '',
             'weakest_function_id': '',
-            'feedback_pointer': 'No speech was detected in the recording.',
+            'feedback_pointer': (
+                'No speech was detected in the recording — try again and speak '
+                'as soon as the countdown ends.'
+            ),
             'next_focus': '',
             'delivery_metrics': asdict(empty_metrics),
-        })
-        return AnalyzeResult(
-            challenge_type=DEFAULT_CHALLENGE_TYPE,
-            framework_name=framework_name,
-            model_version='n/a',
-            functions={},
-            total_score=0,
-            passed=False,
-            strongest_moment='',
-            weakest_function_id='',
-            feedback_pointer='No speech was detected in the recording — try again and speak as soon as the countdown ends.',
-            next_focus='',
-            delivery_metrics=DeliveryMetricsOut(**asdict(empty_metrics)),
-            transcript='',
+        }
+        await remember_attempt(
+            request, topic, side, '', [], data, audio.content_type, empty
         )
+        return AnalyzeResult(**{**empty, 'delivery_metrics': DeliveryMetricsOut(**asdict(empty_metrics)), 'transcript': ''})
 
     delivery_metrics = compute_delivery_metrics(words)
-    prompt_text = f"Argue {record['side'].upper()} on: {record['topic']}"
-    client = get_client()
+    prompt_text = f"Argue {side.upper()} on: {topic}"
     result = await with_retries(
         lambda: score_response(
             client,
             DEFAULT_CHALLENGE_TYPE,
             prompt_text,
-            record['transcript'],
+            transcript,
             asdict(delivery_metrics),
             previous_next_focus=previous_next_focus or None,
         )
     )
 
-    await attach_analysis(transcript_id, {
+    analysis = {
         'challenge_type': result['challenge_type'],
         'framework_name': result['framework_name'],
         'model_version': result['model_version'],
@@ -330,19 +323,14 @@ async def analyze(transcript_id: str = Form(...), previous_next_focus: str = For
         'feedback_pointer': result['feedback_pointer'],
         'next_focus': result['next_focus'],
         'delivery_metrics': asdict(delivery_metrics),
-    })
+    }
+
+    await remember_attempt(
+        request, topic, side, transcript, words, data, audio.content_type, analysis
+    )
 
     return AnalyzeResult(
-        challenge_type=result['challenge_type'],
-        framework_name=result['framework_name'],
-        model_version=result['model_version'],
-        functions=result['functions'],
-        total_score=result['total_score'],
-        passed=result['passed'],
-        strongest_moment=result['strongest_moment'],
-        weakest_function_id=result['weakest_function_id'],
-        feedback_pointer=result['feedback_pointer'],
-        next_focus=result['next_focus'],
+        **{k: v for k, v in analysis.items() if k != 'delivery_metrics'},
         delivery_metrics=DeliveryMetricsOut(**asdict(delivery_metrics)),
-        transcript=record['transcript'],
+        transcript=transcript,
     )
