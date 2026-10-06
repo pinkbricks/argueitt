@@ -5,7 +5,6 @@ import './SiteChrome.css'
 
 const NAV_LINKS = [
   { label: 'Practice', to: '/speak' },
-  { label: 'History', to: '/history' },
   { label: 'Progress', to: '/progress' },
 ]
 
