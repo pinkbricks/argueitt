@@ -1,0 +1,130 @@
+.analysis-error {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.1fr);
+  gap: clamp(20px, 3vw, 44px);
+  align-items: center;
+  width: 100%;
+  max-width: 900px;
+  text-align: left;
+}
+
+/* ---------- Message column ---------- */
+
+.error-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.error-heading {
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-weight: 600;
+  font-size: clamp(21px, 2.1vw, 27px);
+  line-height: 1.15;
+  color: var(--landing-ink);
+  margin: 8px 0 0;
+}
+
+.error-sub {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: clamp(13px, 0.95vw, 15px);
+  line-height: 1.55;
+  color: rgba(12, 11, 10, 0.6);
+  margin: 14px 0 0;
+  max-width: 34ch;
+}
+
+.error-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+  padding: 13px 28px;
+  border: none;
+  border-radius: 999px;
+  background: var(--landing-accent);
+  color: #fff;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.error-retry:hover {
+  background: #e0400f;
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgba(255, 75, 31, 0.3);
+}
+
+.error-retry:focus-visible {
+  outline: 3px solid var(--landing-ink);
+  outline-offset: 3px;
+}
+
+/* ---------- Illustration ---------- */
+
+.sad-blob {
+  width: clamp(110px, 10vw, 150px);
+  height: auto;
+  /* Same gentle float as the landing hero, a touch slower. */
+  animation: sad-blob-float 8s ease-in-out infinite;
+}
+
+@keyframes sad-blob-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-12px) scale(1.015);
+  }
+}
+
+.sad-blob-body {
+  fill: url(#sadBlobGradient);
+}
+
+/* Filled shapes rather than strokes: an inked mark has its own outline, and
+   full ink keeps the face clear of the gradient's darker stops. */
+.sad-blob-face path {
+  fill: var(--landing-ink);
+  stroke: none;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* A degree or two off true, each a different way — nothing drawn by hand
+   lands square. */
+.sad-blob-eye-left {
+  transform: rotate(-4deg);
+}
+
+.sad-blob-eye-right {
+  transform: rotate(3deg);
+}
+
+.sad-blob-mouth {
+  transform: rotate(-1.5deg);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 860px) {
+  .analysis-error {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sad-blob {
+    animation: none;
+  }
+
+  .error-retry:hover {
+    transform: none;
+  }
+}

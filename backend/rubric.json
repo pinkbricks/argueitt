@@ -1,0 +1,92 @@
+{
+  "1": {
+    "skill": "Directness",
+    "criteria": [
+      {
+        "id": "answered_question",
+        "gate": true,
+        "definition": "Did the response directly answer the question asked? 0 = did not answer it, 1 = partially answered or implied an answer, 2 = clearly and directly answered it."
+      },
+      {
+        "id": "on_topic",
+        "gate": false,
+        "definition": "0 = mostly wandered off the question, 1 = some tangents but returned to the point, 2 = stayed relevant throughout."
+      },
+      {
+        "id": "no_circling",
+        "gate": false,
+        "definition": "0 = repeated the same point 3+ times without adding anything new, 1 = repeated the point once, 2 = each sentence added something new."
+      },
+      {
+        "id": "leads_with_bottom_line",
+        "gate": false,
+        "definition": "Does the main answer appear at or near the start of the response, before the explanation/reasoning? 0 = the answer only appears at the end or has to be inferred, 1 = the answer appears after some warm-up or context, 2 = the answer is stated in the first sentence or two."
+      }
+    ]
+  },
+  "2": {
+    "skill": "Clarity",
+    "criteria": [
+      {
+        "id": "understandable_to_novice",
+        "gate": true,
+        "definition": "Could someone with no background in the topic follow this explanation? 0 = confusing or assumes background knowledge, 1 = mostly clear with some jumps, 2 = clear and easy to follow for a novice."
+      },
+      {
+        "id": "jargon_control",
+        "gate": false,
+        "definition": "0 = heavy unexplained jargon, 1 = some jargon but mostly explained, 2 = plain language or jargon is defined when used."
+      },
+      {
+        "id": "logical_flow",
+        "gate": false,
+        "definition": "0 = ideas presented out of order or disconnected, 1 = mostly logical with minor jumps, 2 = clear logical progression from one idea to the next."
+      }
+    ]
+  },
+  "3": {
+    "skill": "Developing an idea",
+    "criteria": [
+      {
+        "id": "clear_position",
+        "gate": true,
+        "definition": "0 = no clear position stated, 1 = position is implied but not stated plainly, 2 = position is stated plainly and early."
+      },
+      {
+        "id": "reasoning",
+        "gate": false,
+        "definition": "0 = no reason given for the position, 1 = a reason is given but weak or vague, 2 = a clear, specific reason supports the position."
+      },
+      {
+        "id": "supporting_example",
+        "gate": false,
+        "definition": "0 = no example or evidence, 1 = a vague or generic example, 2 = a specific, concrete example or piece of evidence."
+      },
+      {
+        "id": "structure",
+        "gate": false,
+        "definition": "Does the answer roughly follow Position -> Reason -> Example? 0 = no discernible structure, 1 = elements present but disordered, 2 = clear structure, easy to follow."
+      }
+    ]
+  },
+  "4": {
+    "skill": "Spontaneous response",
+    "criteria": [
+      {
+        "id": "coherent_answer",
+        "gate": true,
+        "definition": "0 = froze, gave up, or answer doesn't hold together, 1 = produced an answer but it wanders or loses the thread, 2 = coherent answer that holds together start to finish."
+      },
+      {
+        "id": "answered_actual_question",
+        "gate": true,
+        "definition": "0 = answered a different question than the one asked, 1 = partially addressed the actual question, 2 = clearly addressed the actual question asked."
+      },
+      {
+        "id": "recovered_quickly",
+        "gate": false,
+        "definition": "Judge using both the transcript and the pause data provided. 0 = long search for an answer before starting, 1 = brief hesitation then recovered, 2 = started promptly and kept moving."
+      }
+    ]
+  }
+}
