@@ -185,6 +185,52 @@ async def sign_out(request: Request):
     return {'status': 'ok'}
 
 
+async def attach_analysis(transcript_id: str, analysis: dict) -> None:
+    """
+    Stores the analysis on its transcript record.
+
+    Until now the result was returned and thrown away, which left nothing for
+    the Progress page to read. Re-running analysis on the same transcript
+    overwrites the old result rather than accumulating copies.
+    """
+    analysis = {**analysis, 'analysed_at': datetime.now(timezone.utc).isoformat()}
+    async with store_lock:
+        records = load_records()
+        for record in records:
+            if record['id'] == transcript_id:
+                record['analysis'] = analysis
+                break
+        else:
+            return
+        save_records(records)
+
+
+def attempt_summary(record: dict) -> dict:
+    """An attempt as the Progress page needs it — no word timings, no audio."""
+    return {
+        'id': record['id'],
+        'created_at': record['created_at'],
+        'topic': record['topic'],
+        'side': record['side'],
+        'transcript': record.get('transcript', ''),
+        'analysis': record.get('analysis'),
+    }
+
+
+@app.get('/api/attempts')
+async def attempts(request: Request):
+    user_id = current_user_id(request)
+    if not user_id:
+        raise HTTPException(status_code=401, detail='Sign in to see your attempts')
+
+    async with store_lock:
+        records = load_records()
+
+    mine = [r for r in records if r.get('user_id') == user_id]
+    mine.sort(key=lambda r: r.get('created_at', ''), reverse=True)
+    return {'attempts': [attempt_summary(r) for r in mine]}
+
+
 @app.post('/api/transcribe', response_model=TranscriptResult)
 async def transcribe(
     request: Request,
@@ -230,6 +276,19 @@ async def analyze(transcript_id: str = Form(...), previous_next_focus: str = For
 
     if not words:
         empty_metrics = DeliveryMetrics(0, 0.0, 0.0, 0, [], 0, 0.0, [], 0.0)
+        await attach_analysis(transcript_id, {
+            'challenge_type': DEFAULT_CHALLENGE_TYPE,
+            'framework_name': framework_name,
+            'model_version': 'n/a',
+            'functions': {},
+            'total_score': 0,
+            'passed': False,
+            'strongest_moment': '',
+            'weakest_function_id': '',
+            'feedback_pointer': 'No speech was detected in the recording.',
+            'next_focus': '',
+            'delivery_metrics': asdict(empty_metrics),
+        })
         return AnalyzeResult(
             challenge_type=DEFAULT_CHALLENGE_TYPE,
             framework_name=framework_name,
@@ -258,6 +317,20 @@ async def analyze(transcript_id: str = Form(...), previous_next_focus: str = For
             previous_next_focus=previous_next_focus or None,
         )
     )
+
+    await attach_analysis(transcript_id, {
+        'challenge_type': result['challenge_type'],
+        'framework_name': result['framework_name'],
+        'model_version': result['model_version'],
+        'functions': result['functions'],
+        'total_score': result['total_score'],
+        'passed': result['passed'],
+        'strongest_moment': result['strongest_moment'],
+        'weakest_function_id': result['weakest_function_id'],
+        'feedback_pointer': result['feedback_pointer'],
+        'next_focus': result['next_focus'],
+        'delivery_metrics': asdict(delivery_metrics),
+    })
 
     return AnalyzeResult(
         challenge_type=result['challenge_type'],

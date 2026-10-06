@@ -3,6 +3,7 @@ import Landing from './pages/Landing'
 import Speak from './pages/Speak'
 import ComingSoon from './pages/ComingSoon'
 import SignIn from './pages/SignIn'
+import Progress from './pages/Progress'
 
 function getPath() {
   return window.location.pathname
@@ -26,6 +27,10 @@ function App() {
 
   if (path === '/speak') {
     return <Speak onNavigate={navigate} />
+  }
+
+  if (path === '/progress') {
+    return <Progress onNavigate={navigate} />
   }
 
   if (path === '/sign-in') {
