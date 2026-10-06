@@ -1,0 +1,300 @@
+/* ---------- Layout ---------- */
+
+.analysing {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+  gap: clamp(16px, 2vw, 28px);
+  align-items: stretch;
+  width: 100%;
+  max-width: 1120px;
+  text-align: left;
+}
+
+.analysing-main {
+  background: var(--landing-card-soft);
+  border-radius: 28px;
+  box-shadow: 0 24px 50px rgba(12, 11, 10, 0.07);
+  padding: clamp(24px, 3.5vw, 40px);
+}
+
+/* ---------- Topic header ---------- */
+
+.analysing-eyebrow {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--landing-muted);
+  margin: 0;
+}
+
+.analysing-topic {
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-weight: 600;
+  font-size: clamp(22px, 2.6vw, 30px);
+  line-height: 1.3;
+  color: var(--landing-ink);
+  margin: 10px 0 14px;
+  max-width: 24ch;
+}
+
+.analysing-side {
+  display: inline-block;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--landing-accent);
+  background: rgba(255, 75, 31, 0.12);
+  padding: 7px 16px;
+  border-radius: 999px;
+}
+
+/* ---------- Pot + copy ---------- */
+
+.analysing-cook {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 3vw, 32px);
+  margin-top: clamp(20px, 3vh, 32px);
+  padding-top: clamp(20px, 3vh, 32px);
+  border-top: 1px solid var(--landing-tint);
+}
+
+.analysing-pot {
+  flex: 0 0 auto;
+  width: clamp(150px, 20vw, 230px);
+  height: clamp(150px, 20vw, 200px);
+  margin: 0;
+}
+
+/* Bigger than the recording screen's pot — here it is the card's main image. */
+.analysing-pot .pot {
+  width: clamp(130px, 17vw, 190px);
+}
+
+.analysing-cook-copy {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.analysing-heading {
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-weight: 600;
+  font-size: clamp(24px, 3vw, 36px);
+  line-height: 1.15;
+  color: var(--landing-ink);
+  margin: 0 0 12px;
+}
+
+.analysing-sub {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: clamp(14px, 1.2vw, 16px);
+  line-height: 1.55;
+  color: var(--landing-muted);
+  margin: 0;
+  max-width: 30ch;
+}
+
+/* ---------- Checklist ---------- */
+
+.analysing-checks {
+  margin-top: clamp(18px, 3vh, 26px);
+  padding: clamp(16px, 2vw, 22px);
+  border: 1px solid var(--landing-tint);
+  border-radius: 20px;
+}
+
+.check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.check-marker {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  border: 2px solid var(--landing-border);
+  border-radius: 50%;
+  color: #fff;
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.check-done .check-marker,
+.check-active .check-marker {
+  border-color: var(--landing-accent);
+}
+
+.check-done .check-marker {
+  background: var(--landing-accent);
+}
+
+.check-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.check-label {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--landing-ink);
+}
+
+.check-hint {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--landing-muted);
+}
+
+.check-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--landing-muted);
+  white-space: nowrap;
+}
+
+.check-active .check-status {
+  color: var(--landing-accent);
+  font-weight: 500;
+}
+
+.check-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 75, 31, 0.25);
+  border-top-color: var(--landing-accent);
+  border-radius: 50%;
+  animation: analysing-spin 0.9s linear infinite;
+}
+
+@keyframes analysing-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Progress bar ---------- */
+
+.analysing-progress {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: clamp(16px, 2.5vh, 24px);
+}
+
+.analysing-progress-track {
+  flex: 1 1 auto;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--landing-tint);
+  overflow: hidden;
+}
+
+.analysing-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--landing-accent);
+  transition: width 0.6s ease;
+}
+
+.analysing-progress-label {
+  flex: 0 0 auto;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--landing-muted);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1000px) {
+  .analysing {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  }
+
+  .analysing-cook {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .analysing-sub {
+    max-width: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .analysing {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .analysing-cook {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .analysing-cook {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .analysing-sub {
+    margin-inline: auto;
+  }
+
+  .check {
+    flex-wrap: wrap;
+  }
+
+  .check-status {
+    width: 100%;
+    padding-left: 38px;
+  }
+
+  .analysing-progress {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .analysing-progress-label {
+    text-align: right;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .check-spinner {
+    animation: none;
+  }
+
+  .analysing-progress-fill {
+    transition: none;
+  }
+}

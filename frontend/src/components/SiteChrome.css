@@ -1,0 +1,203 @@
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Header ---------- */
+
+.landing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28px clamp(20px, 5vw, 70px);
+}
+
+.landing-logo {
+  font-family: 'Mochiy Pop One', 'Space Grotesk', system-ui, sans-serif;
+  font-size: clamp(24px, 2.4vw, 31px);
+  font-weight: 400;
+  color: var(--landing-accent);
+  text-decoration: none;
+  letter-spacing: 0;
+}
+
+.landing-header-right {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+.landing-nav {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+}
+
+.landing-nav a {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 15px;
+  color: var(--landing-ink);
+  text-decoration: none;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.landing-nav a:hover,
+.landing-nav a:focus-visible {
+  opacity: 1;
+}
+
+.landing-nav a.nav-signin {
+  display: none;
+  color: #fff;
+  opacity: 1;
+}
+
+.btn-signin {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: #fff;
+  background: var(--landing-ink);
+  padding: 11px 24px;
+  border-radius: 999px;
+  text-decoration: none;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-signin:hover,
+.btn-signin:focus-visible {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: none;
+  color: var(--landing-ink);
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ---------- Footer ---------- */
+
+.landing-footer {
+  background: var(--landing-bg);
+  border-top: 1px solid var(--landing-border);
+  padding: 28px clamp(20px, 5vw, 70px) 32px;
+}
+
+.footer-inner {
+  max-width: 1440px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.footer-logo {
+  font-family: 'Mochiy Pop One', 'Space Grotesk', system-ui, sans-serif;
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--landing-ink);
+  margin: 0;
+}
+
+.social-links {
+  display: flex;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(12, 11, 10, 0.25);
+  color: var(--landing-ink);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.social-link:hover,
+.social-link:focus-visible {
+  background: var(--landing-ink);
+  color: #fff;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 700px) {
+  .landing-nav {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    background: var(--landing-bg);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+  }
+
+  .landing-nav.is-open {
+    max-height: 320px;
+  }
+
+  .landing-nav a {
+    padding: 16px clamp(20px, 5vw, 70px);
+    opacity: 1;
+    border-top: 1px solid rgba(12, 11, 10, 0.08);
+  }
+
+  .landing-nav a.nav-signin {
+    display: block;
+    text-align: center;
+    margin: 12px clamp(20px, 5vw, 70px) 16px;
+    border-top: none;
+  }
+
+  .landing-header {
+    /* Flex items stack as a unit by DOM order (later siblings paint over
+       earlier ones), which would otherwise bury this absolutely-positioned
+       dropdown under the page content below it. */
+    position: relative;
+    z-index: 20;
+  }
+
+  .desktop-signin {
+    display: none;
+  }
+
+  .menu-toggle {
+    display: flex;
+  }
+
+  .footer-inner {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+}

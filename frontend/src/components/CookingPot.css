@@ -1,0 +1,181 @@
+/* The boiling pot shared by the recording and analysis screens. Everything
+   here animates transform and opacity only, so it stays off the main thread. */
+
+.pot-scene {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: clamp(130px, 20vh, 160px);
+  margin: 6px 0 2px;
+}
+
+.pot-steam {
+  position: absolute;
+  bottom: 66%;
+  width: 10px;
+  height: 42px;
+  background: linear-gradient(180deg, rgba(255, 138, 92, 0) 0%, rgba(255, 138, 92, 0.4) 100%);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  filter: blur(3px);
+  animation: pot-steam-rise 3s ease-in-out infinite;
+}
+
+.pot-steam-a {
+  left: 36%;
+  animation-delay: 0s;
+}
+
+.pot-steam-b {
+  left: 50%;
+  height: 50px;
+  animation-delay: 0.6s;
+}
+
+.pot-steam-c {
+  left: 64%;
+  animation-delay: 1.2s;
+}
+
+@keyframes pot-steam-rise {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-8px) scaleY(1.08);
+    opacity: 1;
+  }
+}
+
+.pot {
+  position: relative;
+  z-index: 1;
+  width: clamp(110px, 16vw, 128px);
+  height: auto;
+}
+
+.pot-outline {
+  fill: none;
+  stroke: var(--landing-ink);
+  stroke-width: 4;
+  stroke-linejoin: round;
+}
+
+/* Lid and handle move as one piece: steam pressure lifts it, it tips to
+   whichever side gives way first, then clatters back onto the rim. The lift
+   opens a gap over the pot's top edge, so the steam reads as escaping. */
+.pot-lid {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: pot-lid-rattle 1.5s ease-in-out infinite;
+}
+
+@keyframes pot-lid-rattle {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  14% {
+    transform: translateY(-3px) rotate(-1.6deg);
+  }
+  28% {
+    transform: translateY(-1px) rotate(0.7deg);
+  }
+  44% {
+    transform: translateY(-5px) rotate(2deg);
+  }
+  58% {
+    transform: translateY(-1.5px) rotate(-0.9deg);
+  }
+  72% {
+    transform: translateY(-3.5px) rotate(1.2deg);
+  }
+  86% {
+    transform: translateY(0) rotate(-0.3deg);
+  }
+}
+
+.pot-handle {
+  fill: none;
+  stroke: var(--landing-ink);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.pot-rim {
+  stroke: var(--landing-ink);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.pot-liquid {
+  transition: d 1s linear;
+}
+
+.pot-bubble {
+  fill: rgba(255, 255, 255, 0.6);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pot-bubble-rise 2.6s ease-in infinite;
+}
+
+.pot-bubble-2 {
+  animation-delay: 0.4s;
+}
+
+.pot-bubble-3 {
+  animation-delay: 0.9s;
+}
+
+.pot-bubble-4 {
+  animation-delay: 1.3s;
+}
+
+.pot-bubble-5 {
+  animation-delay: 1.8s;
+}
+
+@keyframes pot-bubble-rise {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-18px);
+    opacity: 0;
+  }
+}
+
+.pot-flames {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 0;
+  display: flex;
+  gap: 6px;
+}
+
+.pot-flame {
+  width: 8px;
+  height: 12px;
+  background: var(--landing-accent);
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  opacity: 0.85;
+  box-shadow: 0 0 10px rgba(255, 75, 31, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pot-steam,
+  .pot-bubble,
+  .pot-lid {
+    animation: none;
+  }
+}

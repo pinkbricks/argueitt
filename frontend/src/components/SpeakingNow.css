@@ -1,0 +1,206 @@
+.speaking {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+/* ---------- Card ---------- */
+
+.speaking-card {
+  position: relative;
+  width: 100%;
+  padding: clamp(28px, 5vh, 40px) clamp(24px, 5vw, 36px) clamp(24px, 4vh, 32px);
+  background: var(--landing-card-soft);
+  border-radius: 32px;
+  box-shadow: 0 30px 60px rgba(12, 11, 10, 0.08);
+  overflow: hidden;
+  text-align: center;
+}
+
+.speaking-card-blob {
+  position: absolute;
+  z-index: 0;
+  border-radius: 50%;
+  filter: blur(50px);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.speaking-card-blob-a {
+  width: 220px;
+  height: 220px;
+  top: -80px;
+  left: -60px;
+  background: rgba(255, 75, 31, 0.14);
+}
+
+.speaking-card-blob-b {
+  width: 200px;
+  height: 200px;
+  bottom: -70px;
+  right: -60px;
+  background: rgba(255, 75, 31, 0.08);
+}
+
+.speaking-card-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.speaking-eyebrow {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--landing-muted);
+  margin: 0;
+}
+
+.speaking-topic {
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-weight: 600;
+  font-size: clamp(22px, 3.2vw, 30px);
+  line-height: 1.25;
+  color: var(--landing-ink);
+  margin: 0;
+}
+
+.speaking-pill {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 6px 16px;
+  border-radius: 999px;
+  margin-bottom: 4px;
+}
+
+.speaking-pill-for {
+  color: var(--landing-accent);
+  background: rgba(255, 75, 31, 0.12);
+}
+
+.speaking-pill-against {
+  color: #fff;
+  background: var(--landing-accent);
+}
+
+/* ---------- Timer ---------- */
+
+.speaking-timer-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 0 4px;
+}
+
+.speaking-timer {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: clamp(34px, 6vw, 46px);
+  font-weight: 700;
+  color: var(--landing-ink);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.speaking-timer-label {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--landing-muted);
+}
+
+/* ---------- Cook status ---------- */
+
+.speaking-cook {
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-weight: 700;
+  font-size: clamp(20px, 3vw, 26px);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--landing-ink);
+  margin: 4px 0 0;
+}
+
+.speaking-cook-sub {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 15px;
+  color: var(--landing-muted);
+  margin: 0;
+}
+
+/* ---------- Waveform ---------- */
+
+.speaking-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 32px;
+  width: 100%;
+  margin: 6px 0 2px;
+}
+
+.speaking-wave-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--landing-accent);
+  transition: height 0.12s ease, opacity 0.12s ease;
+}
+
+/* ---------- Stop bar (floating CTA) ---------- */
+
+.speaking-stop-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px;
+  border: none;
+  border-radius: 999px;
+  background: var(--landing-accent);
+  color: #fff;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 16px 34px rgba(244, 81, 30, 0.32);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.speaking-stop-bar:hover {
+  background: #e0400f;
+  transform: translateY(-1px);
+  box-shadow: 0 18px 38px rgba(244, 81, 30, 0.4);
+}
+
+.speaking-stop-bar:focus-visible {
+  outline: 3px solid var(--landing-ink);
+  outline-offset: 3px;
+}
+
+.speaking-stop-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+@media (max-width: 480px) {
+  .speaking-stop-bar {
+    padding: 14px 20px;
+    font-size: 14px;
+    gap: 8px;
+  }
+}

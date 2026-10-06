@@ -1,5 +1,4 @@
 export const topics = [
-  // Existing
   "Social media does more harm than good.",
   "School uniforms should be mandatory.",
   "Artificial intelligence is a threat to humanity, not a benefit.",
@@ -10,7 +9,6 @@ export const topics = [
   "Animals should have legal rights.",
   "Online learning is better than classroom learning.",
   "Junk food should be taxed.",
-  // Tech & AI
   "Smartphones should be banned for children under 14.",
   "Cryptocurrency does more harm than good.",
   "Self-driving cars should be allowed on public roads.",
@@ -21,7 +19,6 @@ export const topics = [
   "The internet is making us less social.",
   "Data privacy should be a fundamental human right.",
   "Video games are good for brain development.",
-  // Ethics & society
   "It is sometimes ethical to lie.",
   "The death penalty should be abolished worldwide.",
   "Universal basic income is a good idea.",
@@ -32,7 +29,6 @@ export const topics = [
   "Revenge can be justified.",
   "It is wrong to eat meat.",
   "Lying to protect someone's feelings is acceptable.",
-  // Education & lifestyle
   "College should be free for everyone.",
   "A four-day work week is better than a five-day one.",
   "Physical education should be optional in schools.",
@@ -43,7 +39,6 @@ export const topics = [
   "Reading books is better than watching movies.",
   "Schools should start later in the morning.",
   "It is better to be an expert in one thing than good at many.",
-  // Politics, science & culture
   "The voting age should be lowered to 16.",
   "Climate change is the biggest threat to humanity.",
   "Nuclear energy should replace fossil fuels.",
@@ -56,4 +51,4 @@ export const topics = [
   "Art can be objectively judged, not just subjectively.",
   "Public transport should be free for everyone.",
   "It is better to live in a big city than in the countryside.",
-];
+]

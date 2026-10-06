@@ -1,10 +1,22 @@
 :root {
-  --purple: #7068BF;
-  --pink: #F19ABE;
-  --lilac: #918BDF;
-  --bg: #FAFCFE;
-  --page: #E4E4FF;
-  --ink: #2b2745;
+  /* Shared brand palette (landing + in-app /speak flow) */
+  --landing-bg: #ECE0CE;
+  --landing-ink: #0c0b0a;
+  --landing-accent: #ff4b1f;
+  --landing-muted: rgba(12, 11, 10, 0.55);
+  --landing-tint: rgba(12, 11, 10, 0.08);
+  --landing-border: rgba(12, 11, 10, 0.25);
+  --landing-danger: #c4457f;
+  --landing-card-soft: #f7f2eb;
+
+  /* Aliases kept for the pre-rebrand /speak flow (Speak.css, AiFeedback)
+     so those files read semantically without a full rename pass. */
+  --purple: var(--landing-accent);
+  --pink: var(--landing-tint);
+  --lilac: var(--landing-muted);
+  --bg: #ffffff;
+  --page: var(--landing-bg);
+  --ink: var(--landing-ink);
 
   font: 16px/1.5 'DM Sans', system-ui, sans-serif;
   color: var(--ink);

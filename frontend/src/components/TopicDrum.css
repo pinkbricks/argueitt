@@ -1,0 +1,252 @@
+.topic-drum-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 1.4vh, 16px);
+  width: 100%;
+  max-width: 1200px;
+  overflow-x: clip;
+}
+
+.topic-drum-eyebrow {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--landing-muted);
+  margin: 0;
+}
+
+.topic-drum-heading {
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-weight: 600;
+  font-size: clamp(22px, min(4vw, 4.2vh), 38px);
+  line-height: 1.2;
+  color: var(--landing-ink);
+  text-align: center;
+  margin: 0;
+}
+
+.topic-drum-subhead {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: clamp(14px, min(1.6vw, 2vh), 17px);
+  color: var(--landing-muted);
+  text-align: center;
+  max-width: 560px;
+  margin: 0 0 clamp(2px, 1vh, 10px);
+}
+
+/* ---------- Drum (vertical reel) ---------- */
+
+.topic-drum {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(4px, 1.5vw, 14px);
+}
+
+.drum-arrow {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(30px, min(4vw, 4.5vh), 40px);
+  height: clamp(30px, min(4vw, 4.5vh), 40px);
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--landing-ink);
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(12, 11, 10, 0.08);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.drum-arrow:hover:not(:disabled) {
+  background: #fff;
+  transform: scale(1.06);
+}
+
+.drum-arrow:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.drum-arrow:focus-visible {
+  outline: 3px solid var(--landing-accent);
+  outline-offset: 2px;
+}
+
+.topic-drum-viewport {
+  position: relative;
+  width: 100%;
+  height: clamp(190px, 34vh, 320px);
+  overflow: hidden;
+  perspective: 1400px;
+  mask-image: linear-gradient(180deg, transparent 0%, black 16%, black 84%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 16%, black 84%, transparent 100%);
+}
+
+.drum-end {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  height: 24px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(12, 11, 10, 0.07), rgba(12, 11, 10, 0.02));
+  z-index: 0;
+}
+
+.drum-end-top {
+  top: -6px;
+}
+
+.drum-end-bottom {
+  bottom: -6px;
+}
+
+.drum-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 28px;
+  background: var(--landing-card-soft);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  z-index: 1;
+}
+
+.drum-card.is-center {
+  background: #fff;
+  box-shadow: 0 24px 55px rgba(244, 81, 30, 0.2);
+  cursor: default;
+}
+
+.drum-card-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 30px;
+  border: 2px solid var(--landing-accent);
+  pointer-events: none;
+}
+
+.drum-card-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 1.6vh, 14px);
+  padding: clamp(12px, 2.2vh, 26px) clamp(20px, 3vw, 32px);
+  text-align: center;
+}
+
+.drum-card-text {
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-weight: 600;
+  font-size: clamp(15px, min(1.9vw, 2.4vh), 21px);
+  line-height: 1.3;
+  color: var(--landing-ink);
+  margin: 0;
+}
+
+.drum-card-pill {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 999px;
+}
+
+.drum-card-pill-for {
+  color: var(--landing-accent);
+  background: rgba(255, 75, 31, 0.12);
+}
+
+.drum-card-pill-against {
+  color: #fff;
+  background: var(--landing-accent);
+}
+
+/* ---------- CTA ---------- */
+
+.drum-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 0;
+  padding: clamp(12px, 2vh, 18px) 30px;
+  border: none;
+  border-radius: 999px;
+  background: var(--landing-accent);
+  color: #fff;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: clamp(15px, 1.6vh, 17px);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 16px 34px rgba(244, 81, 30, 0.32);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.drum-cta:hover:not(:disabled) {
+  background: #e0400f;
+  box-shadow: 0 18px 38px rgba(244, 81, 30, 0.4);
+}
+
+.drum-cta:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.drum-cta:focus-visible {
+  outline: 3px solid var(--landing-ink);
+  outline-offset: 3px;
+}
+
+.drum-cta-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.drum-cta-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 700px) {
+  .topic-drum {
+    gap: 6px;
+  }
+
+  .drum-cta {
+    padding: 16px 22px;
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .drum-cta-meta {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drum-arrow:hover:not(:disabled) {
+    transform: none;
+  }
+}

@@ -1,7 +1,9 @@
 import asyncio
 import json
+import logging
 import os
 import uuid
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,45 +11,26 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from google import genai
 from google.genai import errors as genai_errors
-from google.genai import types
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+
+from framework import get_framework
+from metrics import score_response
+from stats import DeliveryMetrics, compute_delivery_metrics
+from transcript import transcribe_words
 
 load_dotenv()
 
-MODEL = os.getenv('GEMINI_MODEL', 'gemini-3.6-flash')
-MAX_AUDIO_BYTES = 10 * 1024 * 1024
+logger = logging.getLogger('uvicorn.error')
+
+MAX_AUDIO_BYTES = 20 * 1024 * 1024
 TRANSCRIPTS_FILE = Path(__file__).parent / 'data' / 'transcripts.json'
+
+# Argueitt gives a random topic + side with zero prep time, so it's scored
+# against the "answer_the_unexpected" framework (coherence, on-topic, quick recovery).
+DEFAULT_CHALLENGE_TYPE = 'answer_the_unexpected'
 
 app = FastAPI()
 store_lock = asyncio.Lock()
-
-
-class Filler(BaseModel):
-    word: str
-    count: int
-
-
-class StructurePart(BaseModel):
-    part: str = Field(description='One of: Opening, Position, Supporting points, Conclusion')
-    present: bool
-    note: str = Field(description='One short sentence on how well they did it, or what is missing')
-
-
-class Feedback(BaseModel):
-    filler_count: int
-    filler_breakdown: list[Filler]
-    time_to_first_point_seconds: float = Field(
-        description='Seconds from the start of the recording until the speaker first makes an actual claim about the topic'
-    )
-    first_point: str = Field(description='The first real point they made, quoted or closely paraphrased')
-    structure: list[StructurePart]
-    structure_summary: str
-    score: int = Field(ge=1, le=10, description='Overall score from 1 to 10')
-    summary: str
-    strengths: list[str]
-    improvements: list[str] = Field(description='Concrete, actionable pointers for the next attempt')
-    counter_argument: str
-    stronger_opening: str
 
 
 class TranscriptResult(BaseModel):
@@ -55,35 +38,57 @@ class TranscriptResult(BaseModel):
     transcript: str
 
 
-TRANSCRIBE_PROMPT = """Transcribe only the speech that is actually audible in this recording, in English.
-Write exactly what was said, keeping filler words (um, uh, er, ah, like, you know, I mean), repeated words and
-false starts. Do not correct grammar, summarise, complete sentences or add commentary.
-Never invent or guess content: if a part is unclear write [unclear], and if there is no intelligible speech
-return an empty string. Return only the transcript text."""
-
-ANALYSE_PROMPT = """You are a sharp, encouraging debate coach analysing a 60-second spoken argument.
-The speaker was randomly assigned the side "{side}" on the topic: "{topic}".
-
-You are given the recording and its verbatim transcript (fillers included):
-{transcript}
-
-Analyse the speech yourself, using the transcript for content and the audio for timing and delivery:
-1. filler_count and filler_breakdown: count every filler in the transcript. Only count "like", "so",
-   "actually" etc. when used as filler, not as real words. The breakdown must sum to filler_count.
-2. time_to_first_point_seconds: seconds from the start of the audio until they state their first real claim
-   about the topic (greetings, throat clearing, restating the topic and filler do not count). first_point is that claim.
-3. structure: assess exactly four parts in this order: Opening, Position, Supporting points, Conclusion.
-   Mark whether each is present and add a one-sentence note. structure_summary is a one-sentence overall verdict.
-4. score (1-10), summary, strengths, and improvements. improvements are concrete pointers for the next attempt,
-   each tied to something specific they said or did. Also judge whether they stayed on their assigned side.
-5. counter_argument is the strongest point the opposing side would make. stronger_opening is a rewritten first sentence.
-Keep every list item to one or two sentences. If the transcript is empty, say so in summary,
-set counts to 0 and score to 1."""
+class FunctionResult(BaseModel):
+    evidence: str
+    score: int
 
 
-def audio_part(data: bytes, content_type: str | None) -> types.Part:
-    mime = (content_type or 'audio/webm').split(';')[0]
-    return types.Part.from_bytes(data=data, mime_type=mime)
+class DeliveryMetricsOut(BaseModel):
+    word_count: int
+    duration_sec: float
+    words_per_minute: float
+    filler_word_count: int
+    filler_words_found: list[str]
+    long_pause_count: int
+    longest_pause_sec: float
+    pause_details: list[dict]
+    time_to_first_content_word_sec: float
+
+
+class AnalyzeResult(BaseModel):
+    challenge_type: str
+    framework_name: str
+    model_version: str
+    functions: dict[str, FunctionResult]
+    total_score: int
+    passed: bool
+    strongest_moment: str
+    weakest_function_id: str
+    feedback_pointer: str
+    next_focus: str
+    delivery_metrics: DeliveryMetricsOut
+    transcript: str
+
+
+def get_client() -> genai.Client:
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        raise HTTPException(500, 'GEMINI_API_KEY is not set')
+    return genai.Client(api_key=api_key)
+
+
+async def with_retries(coro_fn):
+    for attempt in range(3):
+        try:
+            return await coro_fn()
+        except genai_errors.ServerError:
+            await asyncio.sleep(1 + attempt)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.exception('Gemini call failed')
+            raise HTTPException(502, f'Gemini request failed: {type(exc).__name__}: {exc}') from exc
+    raise HTTPException(503, 'Gemini is busy, try again in a moment')
 
 
 async def read_audio(audio: UploadFile) -> bytes:
@@ -93,23 +98,6 @@ async def read_audio(audio: UploadFile) -> bytes:
     if len(data) > MAX_AUDIO_BYTES:
         raise HTTPException(413, 'Audio too large')
     return data
-
-
-async def generate(parts: list, config: types.GenerateContentConfig | None = None):
-    api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key:
-        raise HTTPException(500, 'GEMINI_API_KEY is not set')
-    client = genai.Client(api_key=api_key)
-    for attempt in range(3):
-        try:
-            return await client.aio.models.generate_content(
-                model=MODEL, contents=parts, config=config
-            )
-        except genai_errors.ServerError:
-            await asyncio.sleep(1 + attempt)
-        except Exception as exc:
-            raise HTTPException(502, f'Gemini request failed: {type(exc).__name__}') from exc
-    raise HTTPException(503, 'Gemini is busy, try again in a moment')
 
 
 def load_records() -> list[dict]:
@@ -137,11 +125,10 @@ async def transcribe(
     audio: UploadFile = File(...),
 ):
     data = await read_audio(audio)
-    response = await generate(
-        [TRANSCRIBE_PROMPT, audio_part(data, audio.content_type)],
-        types.GenerateContentConfig(temperature=0),
+    client = get_client()
+    transcript, words = await with_retries(
+        lambda: transcribe_words(client, data, audio.content_type)
     )
-    transcript = (response.text or '').strip()
 
     record = {
         'id': uuid.uuid4().hex,
@@ -149,6 +136,7 @@ async def transcribe(
         'topic': topic,
         'side': side,
         'transcript': transcript,
+        'words': words,
         'audio_bytes': len(data),
         'audio_type': audio.content_type,
     }
@@ -159,81 +147,58 @@ async def transcribe(
     return TranscriptResult(id=record['id'], transcript=transcript)
 
 
-@app.post('/api/analyze', response_model=Feedback)
-async def analyze(
-    transcript_id: str = Form(...),
-    audio: UploadFile = File(...),
-):
+@app.post('/api/analyze', response_model=AnalyzeResult)
+async def analyze(transcript_id: str = Form(...), previous_next_focus: str = Form('')):
     async with store_lock:
         record = next((r for r in load_records() if r['id'] == transcript_id), None)
     if record is None:
         raise HTTPException(404, 'Transcript not found')
 
-    data = await read_audio(audio)
-    prompt = ANALYSE_PROMPT.format(
-        topic=record['topic'],
-        side=record['side'].upper(),
-        transcript=record['transcript'] or '(no speech detected)',
+    framework_name = get_framework(DEFAULT_CHALLENGE_TYPE)['framework_name']
+    words = record.get('words') or []
+
+    if not words:
+        empty_metrics = DeliveryMetrics(0, 0.0, 0.0, 0, [], 0, 0.0, [], 0.0)
+        return AnalyzeResult(
+            challenge_type=DEFAULT_CHALLENGE_TYPE,
+            framework_name=framework_name,
+            model_version='n/a',
+            functions={},
+            total_score=0,
+            passed=False,
+            strongest_moment='',
+            weakest_function_id='',
+            feedback_pointer='No speech was detected in the recording — try again and speak as soon as the countdown ends.',
+            next_focus='',
+            delivery_metrics=DeliveryMetricsOut(**asdict(empty_metrics)),
+            transcript='',
+        )
+
+    delivery_metrics = compute_delivery_metrics(words)
+    prompt_text = f"Argue {record['side'].upper()} on: {record['topic']}"
+    client = get_client()
+    result = await with_retries(
+        lambda: score_response(
+            client,
+            DEFAULT_CHALLENGE_TYPE,
+            prompt_text,
+            record['transcript'],
+            asdict(delivery_metrics),
+            previous_next_focus=previous_next_focus or None,
+        )
     )
-    response = await generate(
-        [prompt, audio_part(data, audio.content_type)],
-        types.GenerateContentConfig(
-            response_mime_type='application/json',
-            response_schema=Feedback,
-        ),
+
+    return AnalyzeResult(
+        challenge_type=result['challenge_type'],
+        framework_name=result['framework_name'],
+        model_version=result['model_version'],
+        functions=result['functions'],
+        total_score=result['total_score'],
+        passed=result['passed'],
+        strongest_moment=result['strongest_moment'],
+        weakest_function_id=result['weakest_function_id'],
+        feedback_pointer=result['feedback_pointer'],
+        next_focus=result['next_focus'],
+        delivery_metrics=DeliveryMetricsOut(**asdict(delivery_metrics)),
+        transcript=record['transcript'],
     )
-    if not isinstance(response.parsed, Feedback):
-        raise HTTPException(502, 'Gemini returned an unexpected response')
-    return response.parsed
-
-
-
-from google import genai
-
-client = genai.Client()
-
-YOUTUBE_URL = "https://www.youtube.com/watch?v=ku-N-eS1lgM"
-
-prompt = """
-  Process the audio file and generate a detailed transcription.
-    Write exactly what was said, keeping filler words (um, uh, er, ah, like, you know, I mean), repeated words and
-    false starts. Do not correct grammar, summarise, complete sentences or add commentary.
-    Never invent or guess content: if a part is unclear write [unclear], and if there is no intelligible speech
-    return an empty string. Return only the transcript text.
-"""
-
-response_schema = {
-    "type": "object",
-    "properties": {
-        "transcript": {"type": "string"},
-        "segments": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "speaker": {"type": "string"},
-                    "timestamp": {"type": "string"},
-                    "content": {"type": "string"},
-                    "language": {"type": "string"},
-                    "emotion": {
-                        "type": "string",
-                        "enum": ["happy", "sad", "angry", "neutral"]
-                    }
-                },
-                "required": ["speaker", "timestamp", "content", "emotion"]
-            }
-        }
-    },
-    "required": ["summary", "segments"]
-}
-
-interaction = client.interactions.create(
-    model="gemini-3.8-flash",
-    input=[
-        {"type": "video", "uri": YOUTUBE_URL, "mime_type": "video/mp4"},
-        {"type": "text", "text": prompt}
-    ],
-    response_format=response_schema,
-)
-
-print(interaction.output_text)
