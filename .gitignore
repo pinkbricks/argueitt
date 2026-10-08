@@ -1,0 +1,6 @@
+# Local Neon context and credentials
+.neon
+.env
+.env.*
+!.env.example
+node_modules/

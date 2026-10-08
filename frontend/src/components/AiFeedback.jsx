@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react'
 import Analysing from './Analysing'
 import AnalysisError from './AnalysisError'
 
+// A recording keeps its request ID across retries and effect remounts.
+const recordingIds = new WeakMap()
+function requestIdFor(blob) {
+  if (!recordingIds.has(blob)) recordingIds.set(blob, crypto.randomUUID())
+  return recordingIds.get(blob)
+}
+
 const SKIP_AI = false
 
 const MOCK_TRANSCRIPT = "Um, so I think schools starting later would actually help students a lot. Teenagers naturally stay up later and their brains just aren't ready to learn at seven in the morning."
@@ -64,6 +71,8 @@ function AiFeedback({ topic, side, audioBlob, previous, onResult }) {
     ;(async () => {
       try {
         const form = new FormData()
+        form.append('request_id', requestIdFor(audioBlob))
+        if (previous?.attempt_id) form.append('previous_attempt_id', previous.attempt_id)
         form.append('topic', topic)
         form.append('side', side)
         form.append('previous_next_focus', previous?.next_focus || '')

@@ -101,6 +101,16 @@ function Feedback({ topic, side, data, audioUrl, downloadName, previous, onRetry
         <span className="feedback-side">Arguing {side === 'for' ? 'for' : 'against'}</span>
       </header>
 
+      {data.persistence_status === 'not_saved' && (
+        <p className="feedback-saving" role="status">
+          Your feedback is ready, but this attempt couldn’t be saved to your history.
+          Keep this page open to review it and download your recording.
+        </p>
+      )}
+      {data.persistence_status === 'guest' && (
+        <p className="feedback-saving">This attempt is temporary. Sign in before your next attempt to save your progress.</p>
+      )}
+
       <section className="feedback-transcript">
         <div className="feedback-transcript-head">
           <span className="feedback-transcript-title">

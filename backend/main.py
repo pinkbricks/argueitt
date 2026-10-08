@@ -1,20 +1,24 @@
 import asyncio
+import hashlib
 import json
 import logging
 import os
-import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
-from pathlib import Path
+from typing import Literal
+from uuid import UUID
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import JSONResponse
 from google import genai
 from google.genai import errors as genai_errors
 from pydantic import BaseModel
 
 import auth
+import storage
+from database import DatabaseUnavailable
 from framework import get_framework
 from metrics import score_response
 from stats import DeliveryMetrics, compute_delivery_metrics
@@ -25,14 +29,12 @@ load_dotenv()
 logger = logging.getLogger('uvicorn.error')
 
 MAX_AUDIO_BYTES = 20 * 1024 * 1024
-TRANSCRIPTS_FILE = Path(__file__).parent / 'data' / 'transcripts.json'
 
 # Argueitt gives a random topic + side with zero prep time, so it's scored
 # against the "answer_the_unexpected" framework (coherence, on-topic, quick recovery).
 DEFAULT_CHALLENGE_TYPE = 'answer_the_unexpected'
 
 app = FastAPI()
-store_lock = asyncio.Lock()
 
 # Signed, HttpOnly cookie. Vite proxies /api to this server, so dev is
 # same-origin and the cookie needs no CORS handling; keep the two behind one
@@ -80,6 +82,8 @@ class SessionUser(BaseModel):
 
 
 class AnalyzeResult(BaseModel):
+    attempt_id: str | None = None
+    persistence_status: Literal['saved', 'not_saved', 'guest'] = 'not_saved'
     challenge_type: str
     framework_name: str
     model_version: str
@@ -127,17 +131,10 @@ async def read_audio(audio: UploadFile) -> bytes:
     return data
 
 
-def load_records() -> list[dict]:
-    if not TRANSCRIPTS_FILE.exists():
-        return []
-    return json.loads(TRANSCRIPTS_FILE.read_text())
-
-
-def save_records(records: list[dict]) -> None:
-    TRANSCRIPTS_FILE.parent.mkdir(exist_ok=True)
-    tmp = TRANSCRIPTS_FILE.with_suffix('.tmp')
-    tmp.write_text(json.dumps(records, indent=2, ensure_ascii=False))
-    tmp.replace(TRANSCRIPTS_FILE)
+@app.exception_handler(DatabaseUnavailable)
+async def database_error(request: Request, exc: DatabaseUnavailable):
+    logger.warning('Database operation failed (%s)', exc)
+    return JSONResponse(status_code=503, content={'detail': 'Saved history is temporarily unavailable. Please try again.'})
 
 
 @app.get('/')
@@ -159,7 +156,7 @@ async def sign_in_with_google(body: GoogleCredential, request: Request):
         raise HTTPException(status_code=401, detail=str(exc))
 
     user = await auth.upsert_user(claims)
-    # A fresh session id on sign-in, so a pre-login cookie can't be replayed.
+    # Replace any pre-login session contents with the verified identity.
     request.session.clear()
     request.session['user_id'] = user['id']
     return SessionUser(**auth.public_user(user))
@@ -170,7 +167,7 @@ async def me(request: Request):
     user_id = current_user_id(request)
     if not user_id:
         return {'user': None}
-    user = next((u for u in auth.load_users() if u['id'] == user_id), None)
+    user = await storage.get_user(user_id)
     if user is None:
         request.session.clear()
         return {'user': None}
@@ -183,94 +180,81 @@ async def sign_out(request: Request):
     return {'status': 'ok'}
 
 
-async def remember_attempt(
-    request: Request,
-    topic: str,
-    side: str,
-    transcript: str,
-    words: list,
-    audio: bytes,
-    audio_type: str | None,
-    analysis: dict,
-) -> None:
-    """
-    Saves a finished attempt for the Progress page.
+def saved_result(record: dict, request_hash: str) -> AnalyzeResult:
+    if record['request_hash'] != request_hash:
+        raise HTTPException(409, 'This request ID was already used for a different recording.')
+    return AnalyzeResult(**record['analysis'], transcript=record['transcript'],
+                         attempt_id=record['id'], persistence_status='saved')
 
-    Best-effort on purpose: the feedback has already been produced by the time
-    this runs, so a store that can't be written — a read-only filesystem on a
-    serverless host, a full disk — costs the user their history, not their
-    result. It is logged and swallowed rather than failing the request.
-    """
-    record = {
-        'id': uuid.uuid4().hex,
-        'created_at': datetime.now(timezone.utc).isoformat(),
-        # None for signed-out attempts; Progress needs this to tell one
-        # person's attempts from another's.
-        'user_id': current_user_id(request),
-        'topic': topic,
-        'side': side,
-        'transcript': transcript,
-        'words': words,
-        'audio_bytes': len(audio),
-        'audio_type': audio_type,
-        'analysis': {**analysis, 'analysed_at': datetime.now(timezone.utc).isoformat()},
-    }
 
+async def remember_attempt(record: dict) -> AnalyzeResult:
+    result = AnalyzeResult(**record['analysis'], transcript=record['transcript'])
+    if not record['user_id']:
+        return result.model_copy(update={'persistence_status': 'guest'})
+    if record.get('unverified_previous'):
+        # Preserve feedback, but do not silently save a retry without its link
+        # when ownership could not be checked during a database outage.
+        return result
     try:
-        async with store_lock:
-            records = load_records()
-            records.append(record)
-            save_records(records)
-    except OSError as exc:
-        logger.warning('Could not save attempt (feedback was still returned): %s', exc)
-
-
-def attempt_summary(record: dict) -> dict:
-    """An attempt as the Progress page needs it — no word timings, no audio."""
-    return {
-        'id': record['id'],
-        'created_at': record['created_at'],
-        'topic': record['topic'],
-        'side': record['side'],
-        'transcript': record.get('transcript', ''),
-        'analysis': record.get('analysis'),
-    }
+        saved = await storage.save_attempt(record)
+        return saved_result(saved, record['request_hash'])
+    except DatabaseUnavailable as exc:
+        logger.warning('Could not save attempt; feedback still returned (%s)', exc)
+        return result
 
 
 @app.get('/api/attempts')
-async def attempts(request: Request):
+async def attempts(request: Request, limit: int = Query(20, ge=1, le=100),
+                   cursor: str | None = Query(None, max_length=512)):
     user_id = current_user_id(request)
     if not user_id:
         raise HTTPException(status_code=401, detail='Sign in to see your attempts')
-
-    async with store_lock:
-        records = load_records()
-
-    mine = [r for r in records if r.get('user_id') == user_id]
-    mine.sort(key=lambda r: r.get('created_at', ''), reverse=True)
-    return {'attempts': [attempt_summary(r) for r in mine]}
+    try:
+        return await storage.list_attempts(user_id, limit, cursor)
+    except ValueError:
+        raise HTTPException(400, 'Invalid history cursor') from None
 
 
 @app.post('/api/analyze', response_model=AnalyzeResult)
 async def analyze(
     request: Request,
-    topic: str = Form(...),
-    side: str = Form(...),
+    topic: str = Form(..., min_length=1, max_length=2000),
+    side: Literal['for', 'against'] = Form(...),
     audio: UploadFile = File(...),
-    previous_next_focus: str = Form(''),
+    previous_next_focus: str = Form('', max_length=2000),
+    request_id: UUID = Form(...),
+    previous_attempt_id: str | None = Form(None, max_length=128),
 ):
-    """
-    Transcribes and scores one attempt in a single request.
-
-    This used to be two endpoints: /api/transcribe wrote a record, and
-    /api/analyze read the word timings back out of it. That handed off state
-    through the transcript store, which only works where the two calls share a
-    filesystem — on a serverless host they are separate invocations and the
-    second one can't find what the first wrote. Keeping it in one request means
-    the feedback loop needs no storage at all; saving the attempt afterwards is
-    for Progress, and is allowed to fail.
-    """
+    """Generate feedback, then persist it without losing feedback on a DB outage."""
     data = await read_audio(audio)
+    user_id = current_user_id(request)
+    request_hash = hashlib.sha256(json.dumps(
+        [topic, side, previous_attempt_id, previous_next_focus, audio.content_type],
+        separators=(',', ':'),
+    ).encode() + b'\0' + data).hexdigest()
+    # Never hold a database transaction open during Gemini requests.
+    verified_previous_id = None
+    if user_id:
+        try:
+            existing = await storage.get_request(user_id, request_id)
+            if existing:
+                return saved_result(existing, request_hash)
+            if previous_attempt_id:
+                previous = await storage.get_attempt(user_id, previous_attempt_id)
+                if previous is None:
+                    raise HTTPException(404, 'Previous attempt not found')
+                if previous['topic'] != topic or previous['side'] != side:
+                    raise HTTPException(400, 'A retry must use the same topic and side')
+                verified_previous_id = previous['id']
+                previous_next_focus = (previous['analysis'] or {}).get('next_focus', '')
+        except DatabaseUnavailable as exc:
+            logger.warning('History lookup unavailable; continuing practice (%s)', exc)
+    record = {
+        'user_id': user_id, 'request_id': request_id, 'request_hash': request_hash,
+        'previous_attempt_id': verified_previous_id, 'topic': topic, 'side': side,
+        'unverified_previous': bool(user_id and previous_attempt_id and not verified_previous_id),
+        'audio_bytes': len(data), 'audio_type': audio.content_type,
+    }
     client = get_client()
     transcript, words = await with_retries(
         lambda: transcribe_words(client, data, audio.content_type)
@@ -295,11 +279,10 @@ async def analyze(
             ),
             'next_focus': '',
             'delivery_metrics': asdict(empty_metrics),
+            'analysed_at': datetime.now(timezone.utc).isoformat(),
         }
-        await remember_attempt(
-            request, topic, side, '', [], data, audio.content_type, empty
-        )
-        return AnalyzeResult(**{**empty, 'delivery_metrics': DeliveryMetricsOut(**asdict(empty_metrics)), 'transcript': ''})
+        return await remember_attempt({**record, 'transcript': '', 'words': [],
+                                       'analysis': empty})
 
     delivery_metrics = compute_delivery_metrics(words)
     prompt_text = f"Argue {side.upper()} on: {topic}"
@@ -328,12 +311,6 @@ async def analyze(
         'delivery_metrics': asdict(delivery_metrics),
     }
 
-    await remember_attempt(
-        request, topic, side, transcript, words, data, audio.content_type, analysis
-    )
-
-    return AnalyzeResult(
-        **{k: v for k, v in analysis.items() if k != 'delivery_metrics'},
-        delivery_metrics=DeliveryMetricsOut(**asdict(delivery_metrics)),
-        transcript=transcript,
-    )
+    analysis['analysed_at'] = datetime.now(timezone.utc).isoformat()
+    return await remember_attempt({**record, 'transcript': transcript,
+                                   'words': words, 'analysis': analysis})

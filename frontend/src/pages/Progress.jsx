@@ -109,28 +109,57 @@ function Attempt({ attempt }) {
 
 function Progress({ onNavigate }) {
   const { user, status } = useSession()
+  // Remount history when the account changes so another account's data never
+  // appears while its first page is loading.
+  return <ProgressHistory key={user?.id || 'guest'} user={user} status={status} onNavigate={onNavigate} />
+}
+
+function ProgressHistory({ user, status, onNavigate }) {
   const [attempts, setAttempts] = useState([])
   const [state, setState] = useState('loading')
+  const [nextCursor, setNextCursor] = useState(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [moreError, setMoreError] = useState(false)
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
     if (status !== 'ready' || !user) return undefined
-    let cancelled = false
+    const controller = new AbortController()
 
-    fetch('/api/attempts', { credentials: 'same-origin' })
+    fetch('/api/attempts', { credentials: 'same-origin', signal: controller.signal })
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
       .then((body) => {
-        if (cancelled) return
+        if (controller.signal.aborted) return
         setAttempts(body.attempts || [])
+        setNextCursor(body.next_cursor)
         setState('ready')
       })
       .catch(() => {
-        if (!cancelled) setState('error')
+        if (!controller.signal.aborted) setState('error')
       })
 
-    return () => {
-      cancelled = true
+    return () => controller.abort()
+  }, [status, user, reload])
+
+  const loadMore = async () => {
+    if (loadingMore || !nextCursor) return
+    setLoadingMore(true)
+    setMoreError(false)
+    try {
+      const res = await fetch(`/api/attempts?cursor=${encodeURIComponent(nextCursor)}`, { credentials: 'same-origin' })
+      if (!res.ok) throw new Error('History unavailable')
+      const body = await res.json()
+      setAttempts((current) => {
+        const ids = new Set(current.map((attempt) => attempt.id))
+        return [...current, ...body.attempts.filter((attempt) => !ids.has(attempt.id))]
+      })
+      setNextCursor(body.next_cursor)
+    } catch {
+      setMoreError(true)
+    } finally {
+      setLoadingMore(false)
     }
-  }, [status, user])
+  }
 
   const analysed = attempts.filter((a) => a.analysis)
 
@@ -144,7 +173,7 @@ function Progress({ onNavigate }) {
           <h1 className="progress-title">Everything you&apos;ve argued.</h1>
           {status === 'ready' && user && state === 'ready' && (
             <p className="progress-count">
-              {attempts.length} {attempts.length === 1 ? 'attempt' : 'attempts'}
+              {attempts.length} {attempts.length === 1 ? 'attempt' : 'attempts'}{nextCursor ? ' loaded' : ''}
               {analysed.length !== attempts.length && ` · ${analysed.length} analysed`}
             </p>
           )}
@@ -167,9 +196,10 @@ function Progress({ onNavigate }) {
         ) : state === 'loading' ? (
           <p className="progress-status">Loading your attempts…</p>
         ) : state === 'error' ? (
-          <p className="progress-status">
-            Couldn&apos;t load your attempts. Is the backend running?
-          </p>
+          <div className="progress-status" role="status">
+            <p>Couldn&apos;t load your attempts. Please try again.</p>
+            <button className="progress-cta" onClick={() => { setState('loading'); setReload((n) => n + 1) }}>Try again</button>
+          </div>
         ) : attempts.length === 0 ? (
           <section className="progress-empty">
             <p>No attempts yet. Your first one will show up here.</p>
@@ -185,11 +215,20 @@ function Progress({ onNavigate }) {
             </a>
           </section>
         ) : (
-          <ul className="attempt-list">
-            {attempts.map((attempt) => (
-              <Attempt key={attempt.id} attempt={attempt} />
-            ))}
-          </ul>
+          <>
+            <ul className="attempt-list">
+              {attempts.map((attempt) => (
+                <Attempt key={attempt.id} attempt={attempt} />
+              ))}
+            </ul>
+            {moreError && <p className="progress-status" role="status">Couldn’t load more attempts. Please try again.</p>}
+            {nextCursor && (
+              <button className="progress-cta" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </button>
+            )}
+          </>
+
         )}
       </div>
 
