@@ -9,7 +9,7 @@ function dayLabel(day, options) {
     .format(new Date(`${day}T12:00:00Z`))
 }
 
-function PracticeStreak() {
+function PracticeStreak({ compact = false, onNavigate }) {
   const [data, setData] = useState(null)
   const [state, setState] = useState('loading')
   const [retry, setRetry] = useState(0)
@@ -48,15 +48,32 @@ function PracticeStreak() {
     const onVisible = () => { if (document.visibilityState === 'visible') refresh() }
     refresh()
     window.addEventListener('focus', refresh)
+    window.addEventListener('practice-saved', refresh)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
       disposed = true
       controller?.abort()
       clearTimeout(timer)
       window.removeEventListener('focus', refresh)
+      window.removeEventListener('practice-saved', refresh)
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [retry])
+
+  if (compact) {
+    const ready = state === 'ready'
+    const label = ready
+      ? `${data.current_streak}-day practice streak. ${data.practiced_today ? 'Practised today.' : 'Practise today to build your streak.'} View progress.`
+      : state === 'loading' ? 'Loading practice streak. View progress.' : 'Streak unavailable. View progress.'
+    return (
+      <a className={`nav-streak${ready && data.current_streak > 0 ? ' is-active' : ''}`}
+        href="/progress" title={label} aria-label={label}
+        onClick={(event) => { if (onNavigate) onNavigate(event) }}>
+        <Flame size={18} aria-hidden="true" />
+        <span aria-hidden="true">{ready ? data.current_streak : '—'}</span>
+      </a>
+    )
+  }
 
   if (state !== 'ready') {
     return (

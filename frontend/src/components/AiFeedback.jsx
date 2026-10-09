@@ -86,6 +86,7 @@ function AiFeedback({ topic, side, audioBlob, previous, onResult }) {
         if (!res.ok) throw new Error('analysis failed')
 
         const json = await res.json()
+        if (json.persistence_status === 'saved') window.dispatchEvent(new Event('practice-saved'))
         if (cancelled) return
         onResult(json)
         setStatus('done')

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import AccountMenu from './AccountMenu'
+import PracticeStreak from './PracticeStreak'
 import { useSession } from '../hooks/useSession'
 import './SiteChrome.css'
 
@@ -41,6 +42,10 @@ function SiteHeader({ onNavigate }) {
             </a>
           )}
         </nav>
+
+        {status === 'ready' && user && (
+          <PracticeStreak key={user.id} compact onNavigate={go('/progress')} />
+        )}
 
         {status === 'loading' ? (
           <span className="account-placeholder" aria-hidden="true" />
