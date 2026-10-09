@@ -85,6 +85,26 @@ the database retains links for future comparison/resume features.
 uses the signed cookie's user, never an owner ID supplied by the browser. Limits
 are 1–100. Cursor pagination uses timestamp and ID to handle equal timestamps.
 
+## Daily practice streaks
+
+`GET /api/streak?timezone=Africa/Nairobi` returns the signed-in user's current
+streak, longest streak, total practice days, today's completion, and the last seven
+calendar days. The browser supplies its IANA timezone; omitted zones default to
+UTC and invalid zones return HTTP 400. Guests receive HTTP 401.
+
+A day counts when at least one saved attempt has a nonempty transcript and an
+analysis, regardless of score. Multiple attempts on that day count once. Silent,
+unfinished, unsaved, and guest attempts do not count. A streak ending yesterday
+remains active until today ends; missing a full day resets the current streak but
+preserves the personal best.
+
+Streaks are derived from the entire attempt history, including existing records,
+so no new database migration is needed. They use attempt completion/save time.
+Calendar dates are recalculated in the viewer's current timezone (including when
+travelling), rather than storing a fixed account timezone. The card appears on
+Progress and after saved feedback, and refreshes at local midnight or when the
+page regains focus.
+
 ## Import existing JSON data
 
 Back up `data/users.json` and `data/transcripts.json`, then run migrations first.

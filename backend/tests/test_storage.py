@@ -6,6 +6,7 @@ import os
 import tempfile
 import unittest
 import uuid
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from pathlib import Path
 from unittest.mock import patch
@@ -94,6 +95,43 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(child['previous_attempt_id'], parent['id'])
         with self.assertRaises(database.DatabaseUnavailable):
             await storage.save_attempt(self.record(bob['id'], previous_attempt_id=parent['id']))
+
+    async def test_streak_counts_local_days_and_only_completed_owned_practice(self):
+        alice, bob = await self.user(), await self.user('bob')
+        entries = [
+            (alice['id'], '2026-10-08T20:30:00Z', 'Speech', {'passed': False}),
+            (alice['id'], '2026-10-08T21:30:00Z', 'Speech', {'passed': False}),
+            (alice['id'], '2026-10-08T22:30:00Z', 'Retry', {'passed': True}),
+            (alice['id'], '2026-10-10T08:00:00Z', '', {'passed': False}),
+            (alice['id'], '2026-10-10T09:00:00Z', 'Unfinished', None),
+            (bob['id'], '2026-10-10T08:00:00Z', 'Other user', {'passed': True}),
+        ]
+        for owner, timestamp, transcript, analysis in entries:
+            record = await storage.save_attempt(self.record(owner, transcript=transcript, analysis=analysis))
+            async with self.connection() as conn:
+                await conn.execute('UPDATE attempts SET created_at = %s WHERE id = %s', (timestamp, record['id']))
+        instant = datetime(2026, 10, 10, 12, tzinfo=timezone.utc)
+        with patch('storage.datetime') as clock:
+            clock.now.side_effect = lambda zone: instant.astimezone(zone)
+            result = await storage.get_streak(alice['id'], 'Africa/Nairobi')
+            utc = await storage.get_streak(alice['id'], 'UTC')
+        self.assertEqual(result['current_streak'], 2)
+        self.assertEqual(result['total_practice_days'], 2)
+        self.assertFalse(result['practiced_today'])
+        self.assertEqual(utc['current_streak'], 0)
+        self.assertEqual(utc['total_practice_days'], 1)
+
+    async def test_streak_dst_transition_counts_calendar_days(self):
+        user = await self.user()
+        for timestamp in ['2026-03-07T17:00:00Z', '2026-03-08T06:30:00Z', '2026-03-08T07:30:00Z']:
+            record = await storage.save_attempt(self.record(user['id']))
+            async with self.connection() as conn:
+                await conn.execute('UPDATE attempts SET created_at = %s WHERE id = %s', (timestamp, record['id']))
+        with patch('storage.datetime') as clock:
+            clock.now.side_effect = lambda zone: datetime(2026, 3, 9, 12, tzinfo=timezone.utc).astimezone(zone)
+            result = await storage.get_streak(user['id'], 'America/New_York')
+        self.assertEqual(result['current_streak'], 2)
+        self.assertEqual(result['total_practice_days'], 2)
 
     async def test_import_dry_run_repeat_and_atomic_rollback(self):
         with tempfile.TemporaryDirectory() as directory:

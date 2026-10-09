@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { CalendarDays, ChevronDown, Target } from 'lucide-react'
 import SiteHeader from '../components/SiteHeader'
 import SiteFooter from '../components/SiteFooter'
+import PracticeStreak from '../components/PracticeStreak'
 import { useSession } from '../hooks/useSession'
 import './Progress.css'
 
@@ -178,6 +179,8 @@ function ProgressHistory({ user, status, onNavigate }) {
             </p>
           )}
         </header>
+
+        {status === 'ready' && user && <PracticeStreak />}
 
         {status !== 'ready' ? null : !user ? (
           <section className="progress-empty">

@@ -11,6 +11,7 @@ import {
   Target,
 } from 'lucide-react'
 import AudioPlayer from './AudioPlayer'
+import PracticeStreak from './PracticeStreak'
 import { buildHighlights } from '../utils/highlights'
 import './Feedback.css'
 
@@ -100,6 +101,8 @@ function Feedback({ topic, side, data, audioUrl, downloadName, previous, onRetry
         <h1 className="feedback-topic-text">“{topic}”</h1>
         <span className="feedback-side">Arguing {side === 'for' ? 'for' : 'against'}</span>
       </header>
+
+      {data.persistence_status === 'saved' && <PracticeStreak key={data.attempt_id} />}
 
       {data.persistence_status === 'not_saved' && (
         <p className="feedback-saving" role="status">

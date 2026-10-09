@@ -5,10 +5,31 @@ import binascii
 import json
 import uuid
 from datetime import datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from psycopg.types.json import Jsonb
 
 from database import connection
+from streaks import summarize_streak
+
+
+async def get_streak(user_id, timezone_name):
+    try:
+        zone = ZoneInfo(timezone_name)
+    except (ValueError, ZoneInfoNotFoundError):
+        raise ValueError('Invalid timezone') from None
+    async with connection() as conn:
+        # Distinct days across the complete history, independent of pagination.
+        # Silent recordings and unfinished legacy attempts do not earn a day.
+        rows = await (await conn.execute('''
+            SELECT DISTINCT (created_at AT TIME ZONE %s)::date AS practice_day
+            FROM attempts
+            WHERE user_id = %s AND analysis IS NOT NULL
+              AND analysis <> 'null'::jsonb AND btrim(transcript) <> ''
+        ''', (timezone_name, user_id))).fetchall()
+    return {**summarize_streak([row['practice_day'] for row in rows],
+                              datetime.now(zone).date()),
+            'timezone': timezone_name}
 
 
 async def upsert_user(claims):

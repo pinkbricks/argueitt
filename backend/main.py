@@ -215,6 +215,17 @@ async def attempts(request: Request, limit: int = Query(20, ge=1, le=100),
         raise HTTPException(400, 'Invalid history cursor') from None
 
 
+@app.get('/api/streak')
+async def streak(request: Request, timezone: str = Query('UTC', min_length=1, max_length=100)):
+    user_id = current_user_id(request)
+    if not user_id:
+        raise HTTPException(401, 'Sign in to track your practice streak')
+    try:
+        return await storage.get_streak(user_id, timezone)
+    except ValueError:
+        raise HTTPException(400, 'Invalid timezone') from None
+
+
 @app.post('/api/analyze', response_model=AnalyzeResult)
 async def analyze(
     request: Request,

@@ -144,6 +144,21 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         listing.assert_awaited_once_with('alice', 5, 'example')
         self.assertEqual((await self.client.get('/api/attempts?limit=101')).status_code, 422)
 
+    async def test_streak_requires_sign_in_and_uses_cookie_owner(self):
+        self.assertEqual((await self.client.get('/api/streak')).status_code, 401)
+        await self.sign_in()
+        with patch('main.storage.get_streak', AsyncMock(return_value={'current_streak': 3})) as lookup:
+            response = await self.client.get('/api/streak?timezone=Africa/Nairobi&user_id=bob')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['current_streak'], 3)
+        lookup.assert_awaited_once_with('alice', 'Africa/Nairobi')
+
+    async def test_streak_validates_timezone_and_handles_database_outage(self):
+        await self.sign_in()
+        self.assertEqual((await self.client.get('/api/streak?timezone=Invalid/Zone')).status_code, 400)
+        with patch('main.storage.get_streak', AsyncMock(side_effect=DatabaseUnavailable('offline'))):
+            self.assertEqual((await self.client.get('/api/streak')).status_code, 503)
+
     async def test_invalid_cursor_and_history_outage(self):
         await self.sign_in()
         self.assertEqual((await self.client.get('/api/attempts?cursor=bad!')).status_code, 400)
