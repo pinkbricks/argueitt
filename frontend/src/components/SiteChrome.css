@@ -63,11 +63,6 @@
   background: rgba(255, 75, 31, 0.1);
 }
 
-.nav-streak:focus-visible {
-  outline: 2px solid var(--landing-accent);
-  outline-offset: 3px;
-}
-
 .landing-nav a {
   font-family: 'DM Sans', system-ui, sans-serif;
   font-size: 15px;

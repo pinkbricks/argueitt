@@ -44,7 +44,7 @@ function SiteHeader({ onNavigate }) {
         </nav>
 
         {status === 'ready' && user && (
-          <PracticeStreak key={user.id} compact onNavigate={go('/progress')} />
+          <PracticeStreak key={user.id} compact />
         )}
 
         {status === 'loading' ? (
